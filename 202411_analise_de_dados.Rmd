@@ -1,0 +1,630 @@
+## Carregamento dos dados
+
+# Leitura dos pacotes
+
+```{r}
+install.packages("jsonlite")
+install.packages("tidyverse")
+```
+
+#Carregamento dos Pacostes
+
+```{r}
+library(jsonlite)
+library(dplyr)
+```
+
+#Leitura dos Dados
+
+```{r}
+dados <- fromJSON("Base+de+dados+Meteora.json")
+```
+
+#Exibe os dados
+
+```{r}
+head(dados)
+```
+
+## Revelando os campos aninhados
+
+```{r}
+library(tidyr)
+```
+
+```{r}
+# Expande a coluna "produto" para visualizar os dados internos
+dados <- dados %>% 
+  unnest(cols = c(produto, venda))
+```
+
+## Exploração inicial dos dados
+
+\# 2. Resumo estatístico das colunas numéricas
+
+```{r}
+summary(dados)
+```
+
+```{r}
+# Visualizar a estrutura completa do dataframe
+str(dados)
+```
+
+```{r}
+# Lista os nomes de todas as colunas do dataset "dados"
+colnames(dados)
+```
+
+## Tratando o tipo de dado da coluna `data_compra`
+
+```{r}
+# Conversão da coluna 'data_compra' para o tipo Date
+dados <- dados %>%
+  mutate(data_compra = as.Date(data_compra, format = "%Y-%m-%d"))
+```
+
+```{r}
+# Visualizar a estrutura completa do dataframe
+str(dados)
+```
+
+```{r}
+head(dados)
+```
+
+## Verificando valores ausentes
+
+```{r}
+dados %>%
+  summarise_all(~sum(is.na(.)))
+```
+
+```{r}
+# Contar valores ausentes por coluna
+dados %>%
+  summarise(across(everything(), ~ sum(is.na(.)), .names = "NAs em {col}"))
+```
+
+## Removendo os valores Nulos
+
+```{r}
+dados <- dados %>% filter(!is.na(vendedor_id))
+```
+
+```{r}
+dados %>%
+  summarise_all(~sum(is.na(.)))
+```
+
+## Removendo os valores nulos da coluna de preços
+
+```{r}
+dados <- na.omit(dados, cols = "preco")
+```
+
+```{r}
+dados %>%
+  summarise_all(~sum(is.na(.)))
+```
+
+```{r}
+# Contar valores ausentes por coluna
+dados %>%
+  summarise(across(everything(), ~ sum(is.na(.)), .names = "NAs em {col}"))
+```
+
+```{r}
+dados$Estado[is.na(dados$Estado)] <- "Desconhecido"
+```
+
+```{r}
+dados %>%
+  summarise_all(~sum(is.na(.)))
+```
+
+## Verificando dados duplicados
+
+```{r}
+dados %>%
+  filter(duplicated(dados) | duplicated(dados, fromLast = TRUE))
+```
+
+```{r}
+library(dplyr)
+
+# Remover duplicatas considerando todas as colunas
+dados <- dados %>% distinct()
+```
+
+```{r}
+
+dados %>%
+  filter(duplicated(dados) | duplicated(dados, fromLast = TRUE))
+```
+
+## Verificando o campo de `Condicao`
+
+```{r}
+dados %>%
+  summarise_all(n_distinct)
+```
+
+```{r}
+# Visualizar os valores únicos da coluna 'Condicao'
+unique(dados$Condicao)
+```
+
+```{r}
+# Visualizar valores únicos com distinct()
+dados %>% distinct(Condicao)
+```
+
+## Tratando o campo de `Condicao`
+
+```{r}
+library(dplyr)
+library(stringr)
+
+# Ajustar os valores da coluna "Condicao"
+dados <- dados %>%
+  mutate(Condicao = str_replace_all(Condicao, "_", " ") %>%  # Substitui underscore por espaço
+                    str_to_lower() %>%                       # Converte para minúsculas
+                    str_to_title())                          # Converte a primeira letra de cada palavra para maiúscula
+
+# Visualizar os valores únicos após padronização
+unique(dados$Condicao)
+```
+
+## Tratando o campo de `Estado`
+
+```{r}
+head(dados$Estado)
+```
+
+```{r}
+# Usando sub() para remover "BR-" da coluna estado
+dados$Estado <- sub("BR-", "", dados$Estado)
+
+# Visualizar valores únicos
+unique(dados$Estado)
+```
+
+## Iniciando a análise dos dados
+
+```{r}
+dados_selecionados <- dados %>%
+  select(quantidade, preco, valor_total, frete)
+summary(dados_selecionados)
+```
+
+```{r}
+library(ggplot2)
+
+# Histograma para a coluna 'preco' com ajuste de binagem
+ggplot(dados, aes(x = preco)) +
+  geom_histogram(bins = 10, fill = "blue", color = "black") +  # Aumente ou diminua 'bins' conforme necessário
+  labs(title = "Histograma do Preço", x = "Preço", y = "Frequência") +
+  theme_minimal()
+
+# Histograma para a coluna 'frete' com ajuste de binagem
+ggplot(dados, aes(x = frete)) +
+  geom_histogram(bins = 10, fill = "green", color = "black") +  # Ajuste 'bins' para modificar o nível de detalhamento
+  labs(title = "Histograma do Frete", x = "Frete", y = "Frequência") +
+  theme_minimal()
+
+# Histograma para a coluna 'Quantidade' com ajuste de binagem
+ggplot(dados, aes(x = quantidade)) +
+  geom_histogram(bins = 5, fill = "grey", color = "black") +  # Ajuste 'bins' para modificar o nível de detalhamento
+  labs(title = "Histograma da Quantidade", x = "Quantidade", y = "Frequência") +
+  theme_minimal()
+```
+
+```{r}
+library(ggplot2)
+
+# Boxplot para a coluna 'preco'
+ggplot(dados, aes(y = preco)) +
+  geom_boxplot(fill = "blue", color = "black") +
+  labs(title = "Boxplot do Preço", y = "Preço") +
+  theme_minimal()
+
+# Boxplot para a coluna 'frete'
+ggplot(dados, aes(y = frete)) +
+  geom_boxplot(fill = "green", color = "black") +
+  labs(title = "Boxplot do Frete", y = "Frete") +
+  theme_minimal()
+
+# Boxplot para a coluna 'quantidade'
+ggplot(dados, aes(y = quantidade)) +
+  geom_boxplot(fill = "grey", color = "black") +
+  labs(title = "Boxplot da Quantidade", y = "Quantidade") +
+  theme_minimal()
+
+```
+
+```{r}
+head(dados$produto_nome)
+```
+
+```{r}
+# Criar uma nova coluna com a primeira palavra de produto_nome
+dados$tipo_produto <- sub(" .*", "", dados$produto_nome)
+
+# Visualizar os primeiros registros
+head(dados)
+```
+
+```{r}
+library(dplyr)
+
+# Identificar o tipo de produto mais frequente
+produto_mais_frequente <- dados %>%
+  count(tipo_produto, sort = TRUE) %>%
+  slice(1) %>%
+  pull(tipo_produto)
+
+print(produto_mais_frequente)  # Exibe o tipo de produto mais frequente
+```
+
+```{r}
+library(ggplot2)
+
+# Filtrar os dados para o produto mais frequente
+dados_frequente <- dados %>% filter(tipo_produto == produto_mais_frequente)
+
+# Criar histograma
+ggplot(dados_frequente, aes(x = valor_total)) +
+  geom_histogram(bins = 10, fill = "blue", color = "black") +
+  labs(title = paste("Histograma de Valor Total para", produto_mais_frequente),
+       x = "Valor Total", y = "Frequência") +
+  theme_minimal()
+```
+
+```{r}
+library(ggplot2)
+
+# Criar boxplot horizontal
+ggplot(dados_frequente, aes(y = valor_total, x = "")) +
+  geom_boxplot(fill = "orange", color = "black") +
+  coord_flip() +  # Garante o boxplot na horizontal
+  labs(title = paste("Boxplot de Valor Total para", produto_mais_frequente),
+       y = "Valor Total", x = "") +
+  theme_minimal()
+
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# Identificar os 5 produtos mais frequentes
+produtos_top5 <- dados %>%
+  count(tipo_produto, sort = TRUE) %>%
+  slice_max(n, n = 5) %>%
+  pull(tipo_produto)
+
+# Filtrar os dados para os 5 produtos mais frequentes
+dados_top5 <- dados %>% filter(tipo_produto %in% produtos_top5)
+
+# Criar boxplots verticais com limites ajustados
+ggplot(dados_top5, aes(x = tipo_produto, y = valor_total)) +
+  geom_boxplot(fill = "orange", color = "black", outlier.shape = NA) +  # Ocultar outliers
+  coord_cartesian(ylim = c(0, 5000)) +  # Ajuste o valor de acordo com seus dados
+  labs(title = "Boxplots de Valor Total para os 5 Produtos Mais Frequentes",
+       x = "Tipo de Produto", y = "Valor Total") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotaciona rótulos no eixo x
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# Agrupar os dados por data e tipo de produto e somar o valor total das vendas
+dados_agrupados <- dados %>%
+  group_by(data_compra, tipo_produto) %>%
+  summarise(total_vendas = sum(valor_total, na.rm = TRUE), .groups = "drop")
+
+# Filtrar para o produto mais frequente
+produto_mais_frequente <- dados %>%
+  count(tipo_produto, sort = TRUE) %>%
+  slice(1) %>%
+  pull(tipo_produto)
+
+dados_frequente <- dados_agrupados %>% filter(tipo_produto == produto_mais_frequente)
+
+# Calcular a média de total_vendas
+media_vendas <- mean(dados_frequente$total_vendas, na.rm = TRUE)
+
+# Visualizar as vendas com destaque para a média
+ggplot(dados_frequente, aes(x = data_compra, y = total_vendas)) +
+  geom_line(color = "blue") +
+  geom_point(aes(color = total_vendas > media_vendas), size = 3) +  # Destaque pontos acima da média
+  geom_hline(yintercept = media_vendas, linetype = "dashed", color = "red") +  # Linha da média
+  labs(title = paste("Evolução das Vendas do Tipo:", produto_mais_frequente),
+       x = "Data da Compra", y = "Valor Total das Vendas",
+       color = "Acima da Média") +
+  theme_minimal()
+```
+
+```{r}
+# Filtrar os 5 produtos mais frequentes
+produtos_top5 <- dados %>%
+  count(tipo_produto, sort = TRUE) %>%
+  slice_max(n, n = 5) %>%
+  pull(tipo_produto)
+
+# Filtrar e agrupar os dados para os 5 produtos mais frequentes
+dados_top5 <- dados_agrupados %>% filter(tipo_produto %in% produtos_top5)
+
+# Visualizar a evolução das vendas para os 5 produtos mais frequentes
+ggplot(dados_top5, aes(x = data_compra, y = total_vendas, color = tipo_produto)) +
+  geom_line() +
+  labs(title = "Evolução das Vendas por Tipo de Produto",
+       x = "Data da Compra", y = "Valor Total das Vendas", color = "Tipo de Produto") +
+  theme_minimal()
+```
+
+## Criando tabulações focadas nas perguntas de negócios
+
+Perguntas de negócios:
+
+-   Quais as 10 marcas com maior faturamento?
+
+-   Quais vendedores têm o melhor desempenho em vendas?
+
+-   Existem diferenças significativas nas vendas entre os estados?
+
+-   Quais os 10 produtos com maior faturamento?
+
+-   Como a condição do produto impacta no seu valor total?
+
+```{r}
+library(dplyr)
+library(formattable)
+library(lubridate)
+
+# Garantir que data_compra seja reconhecida como Date
+dados <- dados %>%
+  mutate(data_compra = as.Date(data_compra))
+
+# Adicionar o campo de mês e calcular o faturamento por marca e mês
+top_marcas_mensal <- dados %>%
+  mutate(mes = month(data_compra, label = TRUE, abbr = TRUE)) %>%  # Extrair mês abreviado
+  group_by(mes, marca) %>%  # Agrupar por mês primeiro, depois por marca
+  summarise(faturamento = sum(valor_total, na.rm = TRUE), .groups = "drop") %>%
+  arrange(mes, desc(faturamento)) %>%  # Ordenar por mês e faturamento decrescente
+  mutate(faturamento_formatado = currency(faturamento, symbol = "R$", big.mark = ".", decimal.mark = ",")) %>%
+  select(mes, marca, faturamento_formatado)  # Mostrar somente as colunas relevantes
+
+# Visualizar o resultado
+print(top_marcas_mensal)
+
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(stringr)
+
+# Função para classificar os estados por região sem o prefixo "BR-"
+classificar_regiao <- function(Estado) {
+  nordeste <- c("AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE")
+  norte <- c("AC", "AP", "AM", "PA", "RO", "RR", "TO")
+  sudeste <- c("ES", "MG", "RJ", "SP")
+  sul <- c("PR", "RS", "SC")
+  
+  case_when(
+    Estado %in% nordeste ~ "nordeste",
+    Estado %in% norte ~ "norte",
+    Estado %in% sudeste ~ "sudeste",
+    Estado %in% sul ~ "sul",
+    TRUE ~ "outras"
+  )
+}
+
+# Aplicar a classificação e criar a tabela final
+tabela_vendedores <- dados %>%
+  mutate(regiao = classificar_regiao(Estado)) %>%  # Adicionar a coluna de região
+  group_by(vendedor_id, regiao) %>%
+  summarise(total_vendas = sum(valor_total, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = regiao, values_from = total_vendas, values_fill = 0)  # Transformar regiões em colunas
+
+# Visualizar a tabela final
+print(tabela_vendedores)
+```
+
+```{r}
+# Comparar vendas entre estados
+vendas_estados <- dados %>%
+  group_by(Estado) %>%
+  summarise(faturamento = sum(valor_total, na.rm = TRUE),
+            media_vendas = mean(valor_total, na.rm = TRUE)) %>%
+  arrange(desc(faturamento))
+
+# Visualizar o resultado
+print(vendas_estados)
+
+# Visualização
+ggplot(vendas_estados, aes(x = reorder(Estado, -faturamento), y = faturamento)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Faturamento por Estado", x = "Estado", y = "Faturamento") +
+  theme_minimal()
+```
+
+## Verificando a tabela de Top 10 Marcas com Maior Faturamento
+
+### Top 10 Marcas com Maior Faturamento
+
+```{r}
+tab_marcas <- dados %>%
+  group_by(marca) %>%
+  summarise(total_vendas = sum(valor_total)) %>%
+  arrange(desc(total_vendas)) %>%
+  head(10)
+print(tab_marcas)
+```
+
+## Verificando a tabela de Desempenho de Vendedores
+
+```{r}
+tab_desempenho <- dados %>%
+  group_by(vendedor_id) %>%
+  summarise(total_vendas = sum(valor_total)) %>%
+  arrange(desc(total_vendas))
+print(tab_desempenho)
+```
+
+## Verificando a tabela de Top 10 Produtos com Maior Faturamento
+
+```{r}
+tab_produtos <- dados %>%
+  group_by(tipo_produto, produto_nome) %>%
+  summarise(total_vendas = sum(valor_total), .groups = "drop") %>%
+  arrange(desc(total_vendas)) %>%
+  head(10)
+print(tab_produtos)
+```
+
+## Verificando a tabela de Impacto da Condição do Produto no Valor Total
+
+```{r}
+tab_condicao <- dados %>%
+  group_by(Condicao) %>%
+  summarise(
+    valor_total = sum(valor_total),
+    quantidade_vendas = n()
+  ) %>%
+  arrange(desc(valor_total))
+print(tab_condicao)
+```
+
+## Verificando a tabela de Vendas ao Longo do Tempo
+
+```{r}
+tab_venda_tempo <- dados %>%
+  group_by(data_compra) %>%
+  summarise(total_vendas = sum(valor_total)) %>%
+  arrange(data_compra)
+print(tab_venda_tempo)
+```
+
+## Criando visualizações para responder às perguntas de negócios
+
+**Quais as 10 marcas com maior faturamento?** e **Quais os 10 produtos com maior faturamento?**
+
+```{r}
+tab_marcas
+```
+
+```{r}
+library(ggplot2)
+
+# Criar gráfico de barras com ajustes para exibir todos os valores
+ggplot(tab_marcas, aes(x = reorder(marca, total_vendas), y = total_vendas)) +
+  geom_bar(stat = "identity", fill = "steelblue", color = "black") +
+  geom_text(aes(label = scales::comma(total_vendas, big.mark = ".", decimal.mark = ",")), 
+            hjust = -0.1, size = 4) +  # Ajuste para exibir os valores
+  labs(title = "Top 10 Marcas com Maior Faturamento", 
+       x = "Marcas", 
+       y = "Total de Vendas") +
+  coord_flip() +  # Inverte os eixos
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.2))) +  # Aumenta o espaço no eixo y
+  theme_minimal()
+```
+
+## Criando a visualização para Top 10 Produtos com Maior Faturamento
+
+```{r}
+tab_produtos
+```
+
+```{r}
+library(ggplot2)
+
+# Criar gráfico de barras com ajustes para exibir todos os valores
+ggplot(tab_produtos, aes(x = reorder(produto_nome, total_vendas), y = total_vendas)) +
+  geom_bar(stat = "identity", fill = "purple", color = "black") +
+  geom_text(aes(label = scales::comma(total_vendas, big.mark = ".", decimal.mark = ",")), 
+            hjust = -0.1, size = 4) +  # Ajuste para exibir os valores
+  labs(title = "Top 10 Produtos com Maior Faturamento", 
+       x = "Produtos", 
+       y = "Total de Vendas") +
+  coord_flip() +  # Inverte os eixos
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.2))) +  # Aumenta o espaço no eixo y
+  theme_minimal()
+```
+
+## Criando a visualização para Desempenho de Vendedores
+
+**Quais vendedores têm o melhor desempenho em vendas?** e **Existem diferenças significativas nas vendas entre os estados?**,
+
+```{r}
+tabela_vendedores
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# Transformar a tabela em formato longo (long format)
+tabela_vendedores_long <- tabela_vendedores %>%
+  pivot_longer(cols = c(nordeste, norte, sudeste, sul, outras),  # Colunas das regiões
+               names_to = "regiao",  # Nova coluna para os nomes das regiões
+               values_to = "vendas")  # Nova coluna para os valores das vendas
+
+# Criar gráfico de barras empilhadas com valores
+ggplot(tabela_vendedores_long, aes(x = as.factor(vendedor_id), y = vendas, fill = regiao)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = scales::number(vendas / 1e6, accuracy = 0.01, suffix = "M")), 
+            position = position_stack(vjust = 0.5), size = 3) +  # Adiciona valores nas barras
+  labs(title = "Vendas por Vendedor e Região", 
+       x = "Vendedor", 
+       y = "Total de Vendas (em milhões)", 
+       fill = "Região") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotacionar rótulos do eixo X
+```
+
+## Criando a visualização para Impacto da Condição do Produto no Valor Total
+
+```{r}
+tab_condicao
+```
+
+## Modificando a visualização para Desempenho de Vendedores
+
+```{r}
+tab_condicao <- dados %>%
+  group_by(Condicao, tipo_produto) %>%
+  summarise(
+    valor_total = sum(valor_total),
+    quantidade_vendas = n()
+  ) %>%
+  arrange(desc(valor_total))
+print(tab_condicao)
+```
+
+```{r}
+# Carregar pacotes necessários
+library(ggplot2)
+library(dplyr)
+
+
+tipo_produto_especifico <- "Vestido" # Substitua pelo tipo de produto desejado
+
+dados_filtrados <- tab_condicao %>%
+  filter(tipo_produto == tipo_produto_especifico)
+
+# Criar gráfico de barras
+ggplot(dados_filtrados, aes(x = Condicao, y = valor_total, fill = Condicao)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Gráfico de Barras para Condições Específicas",
+       x = "Condição",
+       y = "Valor Total") +
+  theme_minimal()
+```
+
+## 
